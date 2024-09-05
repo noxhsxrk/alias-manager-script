@@ -1,0 +1,92 @@
+#!/bin/bash
+
+ZSHRC_PATH="$HOME/.zshrc"
+
+# Define color codes
+COLOR_ALIAS="\033[1;34m"       # Bold Blue
+COLOR_COMMAND="\033[1;32m"     # Bold Green
+COLOR_DESCRIPTION="\033[1;36m" # Bold Cyan
+COLOR_RESET="\033[0m"          # Reset to default color
+
+function show_all_aliases() {
+    echo "Aliases in your .zshrc file:"
+    local description=""
+    grep -E '^#description=|^alias ' "$ZSHRC_PATH" | while read -r line; do
+        if [[ $line == \#description=* ]]; then
+            description=$(echo "$line" | sed 's/#description=//')
+        elif [[ $line == alias* ]]; then
+            alias_name=$(echo "$line" | cut -d'=' -f1 | cut -d' ' -f2)
+            alias_command=$(echo "$line" | cut -d'=' -f2- | sed "s/^'//;s/'$//")
+
+            echo -e "${COLOR_ALIAS}Alias:${COLOR_RESET} $alias_name"
+            echo -e "${COLOR_COMMAND}Command:${COLOR_RESET} $alias_command"
+            echo -e "${COLOR_DESCRIPTION}Description:${COLOR_RESET} $description"
+            echo
+
+            description=""
+        fi
+    done | less
+}
+
+function show_alias_list() {
+    echo "Available aliases:"
+    local colors=("\033[1;31m" "\033[1;32m" "\033[1;33m" "\033[1;34m" "\033[1;35m" "\033[1;36m") # Red, Green, Yellow, Blue, Magenta, Cyan
+    local color_reset="\033[0m"
+    local index=0
+
+    grep '^alias ' "$ZSHRC_PATH" | while read -r line; do
+        alias_name=$(echo "$line" | cut -d'=' -f1 | cut -d' ' -f2)
+        color=${colors[$((index % ${#colors[@]}))]}
+        echo -en "${color}${alias_name}${color_reset} "
+        index=$((index + 1))
+    done
+    echo
+}
+
+function show_alias_details() {
+    local alias_name=$1
+    local description=""
+    local alias_command=""
+
+    while read -r line; do
+        if [[ $line == \#description=* ]]; then
+            description=$(echo "$line" | sed 's/#description=//')
+        elif [[ $line == alias* ]]; then
+            alias_command=$(echo "$line" | cut -d'=' -f2- | sed "s/^'//;s/'$//")
+
+            echo -e "${COLOR_ALIAS}Alias:${COLOR_RESET} $alias_name"
+            echo -e "${COLOR_COMMAND}Command:${COLOR_RESET} $alias_command"
+            echo -e "${COLOR_DESCRIPTION}Description:${COLOR_RESET} $description"
+            echo
+        fi
+    done < <(grep -E "^#description=|^alias $alias_name=" "$ZSHRC_PATH")
+
+    while true; do
+        echo "Enter 'b' to go back or type 'q' to quit:"
+        read -p "> " input
+        if [[ "$input" == "b" ]]; then
+            return
+        elif [[ "$input" == "q" ]]; then
+            exit 0
+        else
+            echo "Invalid input. Please enter 'q' to go back"
+        fi
+    done
+}
+
+if [[ $1 == "--show-all" || $1 == "--a" ]]; then
+    show_all_aliases
+else
+    while true; do
+        show_alias_list
+        echo "Enter an alias to see details, or type 'q' to quit:"
+        read -p "> " input
+        if [[ "$input" == "q" ]]; then
+            break
+        elif grep -q "^alias $input=" "$ZSHRC_PATH"; then
+            show_alias_details "$input"
+        else
+            echo "Alias not found. Please try again."
+        fi
+    done
+fi
